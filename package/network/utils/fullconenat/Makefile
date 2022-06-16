@@ -37,19 +37,6 @@ define Package/iptables-mod-fullconenat/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/libipt_FULLCONENAT.so $(1)/usr/lib/iptables
 endef
 
-define Package/ip6tables-mod-fullconenat
-  SUBMENU:=Firewall
-  SECTION:=net
-  CATEGORY:=Network
-  TITLE:=FULLCONENAT ip6tables extension
-  DEPENDS:=+ip6tables +kmod-nf-nat6 +kmod-ipt-fullconenat
-endef
-
-define Package/ip6tables-mod-fullconenat/install
-	$(INSTALL_DIR) $(1)/usr/lib/iptables
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/libip6t_FULLCONENAT.so $(1)/usr/lib/iptables
-endef
-
 define KernelPackage/ipt-fullconenat
   SUBMENU:=Netfilter Extensions
   TITLE:=FULLCONENAT netfilter module
@@ -77,6 +64,5 @@ define Build/Compile
 	$(call Build/Compile/Default)
 endef
 
-$(eval $(call KernelPackage,ipt-fullconenat))
 $(eval $(call BuildPackage,iptables-mod-fullconenat))
-$(eval $(call BuildPackage,ip6tables-mod-fullconenat))
+$(eval $(call KernelPackage,ipt-fullconenat))
