@@ -11,11 +11,20 @@ PKG_RELEASE:=1
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL=$(PROJECT_GIT)/project/iwinfo.git
-PKG_SOURCE_DATE:=2021-07-11
-PKG_SOURCE_VERSION:=a0a0e02dd91d14a50155390d5fd3b95d6ec87bf4
-PKG_MIRROR_HASH:=7b4f745c2cace836e57bd116399973d9ac32cee7f98d4628a17395caa3d0cebc
+PKG_SOURCE_DATE:=2022-04-26
+PKG_SOURCE_VERSION:=dc6847eb5ec8747867bc20f1024723c6397c1df7
+PKG_MIRROR_HASH:=3f243cf75f4cec02e9e8ecc2087577146845346c0172808f64dea066f84f88d4
 PKG_MAINTAINER:=Jo-Philipp Wich <jo@mein.io>
 PKG_LICENSE:=GPL-2.0
+
+PKG_FLAGS := nonshared
+
+PKG_CONFIG_DEPENDS := \
+	CONFIG_PACKAGE_kmod-brcm-wl \
+	CONFIG_PACKAGE_kmod-brcm-wl-mini \
+	CONFIG_PACKAGE_kmod-brcm-wl-mimo \
+	CONFIG_PACKAGE_kmod-mt7615d_dbdc \
+	CONFIG_PACKAGE_kmod-cfg80211
 
 IWINFO_ABI_VERSION:=20210430
 
@@ -26,13 +35,13 @@ define Package/libiwinfo
   SECTION:=libs
   CATEGORY:=Libraries
   TITLE:=Generalized Wireless Information Library (iwinfo)
-  DEPENDS:=+libnl-tiny +libuci +libubus +libiwinfo-data
+  DEPENDS:=+PACKAGE_kmod-cfg80211:libnl-tiny +libuci +libubus +libiwinfo-data
   ABI_VERSION:=$(IWINFO_ABI_VERSION)
 endef
 
 define Package/libiwinfo/description
-  Wireless information library with simplified API for nl80211
-  and wext driver interfaces.
+  Wireless information library with simplified API for Broadcom,
+  nl80211, mt_dbdc and wext driver interfaces.
 endef
 
 
@@ -71,6 +80,13 @@ endef
 define Build/Configure
 endef
 
+IWINFO_BACKENDS := \
+	$(if $(CONFIG_PACKAGE_kmod-brcm-wl),wl) \
+	$(if $(CONFIG_PACKAGE_kmod-brcm-wl-mini),wl) \
+	$(if $(CONFIG_PACKAGE_kmod-brcm-wl-mimo),wl) \
+	$(if $(CONFIG_PACKAGE_kmod-mt7615d_dbdc),ra) \
+	$(if $(CONFIG_PACKAGE_kmod-cfg80211),nl80211)
+
 TARGET_CFLAGS += \
 	-I$(STAGING_DIR)/usr/include/libnl-tiny \
 	-I$(STAGING_DIR)/usr/include \
@@ -80,7 +96,7 @@ MAKE_FLAGS += \
 	FPIC="$(FPIC)" \
 	CFLAGS="$(TARGET_CFLAGS)" \
 	LDFLAGS="$(TARGET_LDFLAGS)" \
-	BACKENDS="nl80211" \
+	BACKENDS="$(IWINFO_BACKENDS)" \
 	SOVERSION="$(IWINFO_ABI_VERSION)"
 
 define Build/InstallDev
@@ -96,7 +112,6 @@ endef
 define Package/libiwinfo/install
 	$(INSTALL_DIR) $(1)/usr/lib
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/libiwinfo.so.$(IWINFO_ABI_VERSION) $(1)/usr/lib/libiwinfo.so.$(IWINFO_ABI_VERSION)
-	$(LN) libiwinfo.so.$(IWINFO_ABI_VERSION) $(1)/usr/lib/libiwinfo.so
 endef
 
 define Package/libiwinfo-lua/install

@@ -23,6 +23,7 @@ define Package/mt_wifi
   CATEGORY:=Network
   TITLE:=MTK wifi AP config
   DEPENDS:=@TARGET_ramips +wireless-tools
+  CONFLICTS:=kmod-mt7615d_dbdc
   SUBMENU:=Wireless
 endef
 
@@ -43,6 +44,7 @@ define Package/mt_wifi/install
 	$(INSTALL_DIR) $(1)/etc/wireless/mt7615/
 	$(INSTALL_DIR) $(1)/etc_ro/Wireless/RT2860AP/
 	$(INSTALL_DIR) $(1)/lib/preinit/
+	$(INSTALL_DIR) $(1)/etc_ro/wlan/
 ifeq ($(CONFIG_MTK_CHIP_MT7603E_MT7612E),y)
 	$(INSTALL_BIN) ./files/7603_7612-l1profile.dat $(1)/etc/wireless/l1profile.dat
 	$(INSTALL_BIN) ./files/mt7603.dat $(1)/etc/wireless/mt7615/mt7615.1.dat

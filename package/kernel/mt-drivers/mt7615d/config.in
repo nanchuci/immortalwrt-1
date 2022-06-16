@@ -51,6 +51,7 @@ choice
 	default MTK_SECOND_IF_NONE if TARGET_ramips_mt7621_DEVICE_glinet_gl-mt1300
 	default MTK_SECOND_IF_NONE if TARGET_ramips_mt7621_DEVICE_jcg_y2
 	default MTK_SECOND_IF_NONE if TARGET_ramips_mt7621_DEVICE_phicomm_k2p
+	default MTK_SECOND_IF_NONE if TARGET_ramips_mt7621_DEVICE_raisecom_msg1500-x-00
 	default MTK_SECOND_IF_MT7615E
 
 config MTK_SECOND_IF_NONE
@@ -280,7 +281,8 @@ config MTK_DBDC_MODE
 	select DEFAULT_5G_PROFILE
 	default y if TARGET_ramips_mt7621_DEVICE_glinet_gl-mt1300
 	default y if TARGET_ramips_mt7621_DEVICE_jcg_y2
-	default y if TARGET_ramips_mt7621_DEVICE_phicomm_k2p
+	default y if TARGET_ramips_mt7621_DEVICE_phicomm_k2p || TARGET_DEVICE_ramips_mt7621_DEVICE_phicomm_k2p
+	default y if TARGET_ramips_mt7621_DEVICE_raisecom_msg1500-x-00 || TARGET_DEVICE_ramips_mt7621_DEVICE_raisecom_msg1500-x-00
 	default n
 
 config MTK_MULTI_PROFILE_SUPPORT
@@ -288,16 +290,19 @@ config MTK_MULTI_PROFILE_SUPPORT
 	depends on MTK_DBDC_MODE
 	default y if TARGET_ramips_mt7621_DEVICE_glinet_gl-mt1300
 	default y if TARGET_ramips_mt7621_DEVICE_jcg_y2
-	default y if TARGET_ramips_mt7621_DEVICE_phicomm_k2p
+	default y if TARGET_ramips_mt7621_DEVICE_phicomm_k2p || TARGET_DEVICE_ramips_mt7621_DEVICE_phicomm_k2p
+	default y if TARGET_ramips_mt7621_DEVICE_raisecom_msg1500-x-00 || TARGET_DEVICE_ramips_mt7621_DEVICE_raisecom_msg1500-x-00
 	default n
 
 config MTK_DEFAULT_5G_PROFILE
 	bool "5G default profile for DBDC"
 	depends on MTK_DBDC_MODE
 #	depends on MTK_MULTI_PROFILE_SUPPORT
+	depends on !PACKAGE_kmod-mt7615d_dbdc
 	default y if TARGET_ramips_mt7621_DEVICE_glinet_gl-mt1300
 	default y if TARGET_ramips_mt7621_DEVICE_jcg_y2
-	default y if TARGET_ramips_mt7621_DEVICE_phicomm_k2p
+	default y if TARGET_ramips_mt7621_DEVICE_phicomm_k2p || TARGET_DEVICE_ramips_mt7621_DEVICE_phicomm_k2p
+	default y if TARGET_ramips_mt7621_DEVICE_raisecom_msg1500-x-00 || TARGET_DEVICE_ramips_mt7621_DEVICE_raisecom_msg1500-x-00
 	default n
 
 config MTK_WSC_INCLUDED
@@ -457,11 +462,11 @@ config MTK_LINK_TEST_SUPPORT
 	depends on MTK_WIFI_DRIVER
 	default n
 
-#config MTK_LED_CONTROL_SUPPORT
-#	bool "LED Support"
-#	depends on MTK_WIFI_DRIVER
-#	depends on MTK_MT_AP_SUPPORT
-#	default n
+config MTK_LED_CONTROL_SUPPORT
+	bool "LED Support"
+	depends on MTK_WIFI_DRIVER
+	depends on MTK_MT_AP_SUPPORT
+	default y
 
 config MTK_ATE_SUPPORT
 	bool "ATE/QA Support"
@@ -896,7 +901,7 @@ config MTK_BAND_STEERING
 
 config MTK_LED_CONTROL_SUPPORT
         bool "LED Control Support"
-        default n
+	default y
 
 config MTK_WLAN_HOOK
        bool "WLAN hook Support"

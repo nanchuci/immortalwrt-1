@@ -38,6 +38,11 @@
 #include "phy/rlm_cal_cache.h"
 #endif /* RLM_CAL_CACHE_SUPPORT */
 
+
+#ifdef CONFIG_FAST_NAT_SUPPORT
+#include <net/ra_nat.h>
+#endif /*CONFIG_FAST_NAT_SUPPORT*/
+
 #define BSSID_WCID_TO_REMOVE 1
 
 struct l1profile_info_t {

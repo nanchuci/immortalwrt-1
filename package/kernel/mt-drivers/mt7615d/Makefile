@@ -7,13 +7,16 @@ include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/kernel.mk
 
 PKG_NAME:=mt7615d
+P4REV:=9
 PKG_VERSION:=5.1.0.0
-P4REV:=8
+
+PKG_BUILD_PARALLEL:=1
 
 PKG_BUILD_DIR:=$(KERNEL_BUILD_DIR)/$(PKG_NAME)
 PKG_KCONFIG:= \
 	SUPPORT_OPENWRT \
 	WIFI_DRIVER \
+	FIRST_IF_MT7603E \
 	FIRST_IF_MT7615E \
 	FIRST_IF_MT7622 \
 	FIRST_IF_MT7626 \
@@ -133,6 +136,8 @@ PKG_KCONFIG:= \
 	DPP_FEATURE \
 	ENTERPRISE_AP_SUPPORT \
 	DYNAMIC_VLAN_SUPPORT \
+	RA_HW_NAT \
+	RA_HW_NAT_WIFI_NEW_ARCH \
 	CFG80211_SUPPORT \
 	CUSTOMISED_HOSTAPD_SUPPORT \
 	APCLI_STA_SUPPORT \
@@ -185,15 +190,17 @@ TAR_CMD=$(HOST_TAR) -C $(1)/ $(TAR_OPTIONS)
 define KernelPackage/mt7615d
   CATEGORY:=Kernel modules
   TITLE:=MTK wifi AP driver
-  DEPENDS:=@TARGET_ramips
+  DEPENDS:=@TARGET_ramips +MTK_CFG80211_SUPPORT:kmod-cfg80211 +@DRIVER_11AC_SUPPORT +@DRIVER_11N_SUPPORT +@DRIVER_11W_SUPPORT
   KCONFIG:= \
 	CONFIG_PCI_MSI=y \
 	CONFIG_NET_SCH_FQ=y
 ifneq ($(CONFIG_MTK_WHNAT_SUPPORT),)
   FILES:=$(PKG_BUILD_DIR)/mt_wifi_ap/mt_wifi.ko \
 	$(PKG_BUILD_DIR)/mt_wifi/embedded/plug_in/whnat/mt_whnat.ko
+  AUTOLOAD:=$(call AutoProbe,mt_wifi mt_whnat)
 else
   FILES:=$(PKG_BUILD_DIR)/mt_wifi_ap/mt_wifi.ko
+  AUTOLOAD:=$(call AutoProbe,mt_wifi)
 endif
   SUBMENU:=Wireless Drivers
   MENU:=1
@@ -203,17 +210,57 @@ define KernelPackage/mt7615d/config
 	source "$(SOURCE)/config.in"
 endef
 
+define KernelPackage/mt7615d_dbdc
+  CATEGORY:=Kernel modules
+  TITLE:=MTK wifi AP driver
+  DEPENDS:=@TARGET_ramips +kmod-mt7615d +maccalc
+  SUBMENU:=Wireless Drivers
+  MENU:=1
+endef
+
+define KernelPackage/mt7615d_dbdc/config
+	select MTK_WIFI_DRIVER
+	select MTK_FIRST_IF_MT7615E
+	select MTK_MT_WIFI
+	select MTK_WIFI_MT_MAC
+	select MTK_CHIP_MT7615E
+	select MTK_DBDC_MODE
+endef
+
+NOSTDINC_FLAGS = \
+	-I$(STAGING_DIR)/usr/include/mac80211-backport/uapi \
+	-I$(STAGING_DIR)/usr/include/mac80211-backport \
+	-I$(STAGING_DIR)/usr/include/mac80211/uapi \
+	-I$(STAGING_DIR)/usr/include/mac80211 \
+	-include backport/autoconf.h \
+	-include backport/backport.h
+
 define Build/Compile
-	$(MAKE) -C "$(LINUX_DIR)" V=1 \
+	+$(MAKE) $(PKG_JOBS) -C "$(LINUX_DIR)" \
+		$(KERNEL_MAKE_FLAGS) \
 		CROSS_COMPILE="$(TARGET_CROSS)" \
 		ARCH="$(LINUX_KARCH)" \
-		M="$(PKG_BUILD_DIR)/mt_wifi_ap" \
 		$(foreach c, $(PKG_KCONFIG),$(if $(CONFIG_MTK_$c),CONFIG_$(c)=$(CONFIG_MTK_$(c)))) \
+		M="$(PKG_BUILD_DIR)/mt_wifi_ap" \
+		$(if $(CONFIG_MTK_CFG80211_SUPPORT),NOSTDINC_FLAGS="$(NOSTDINC_FLAGS)") \
+		V=1 \
 		modules
 endef
 
+define Build/Install
+        :
+endef
+
 define KernelPackage/mt7615d/install
-	$(INSTALL_DIR) $(1)/etc/wireless/mt7615/
+	:
+endef
+
+define KernelPackage/mt7615d_dbdc/install
+	$(INSTALL_DIR) $(1)/lib/wifi $(1)/lib/netifd/wireless $(1)/etc/uci-defaults
+	$(INSTALL_DATA) ./files/lib/wifi/mt_dbdc.sh $(1)/lib/wifi
+	$(INSTALL_BIN) ./files/lib/netifd/wireless/mt_dbdc.sh $(1)/lib/netifd/wireless
+	$(INSTALL_DATA) ./files/etc/uci-defaults/10_mt7615_dbdc $(1)/etc/uci-defaults/10_mt7615_dbdc
 endef
 
 $(eval $(call KernelPackage,mt7615d))
+$(eval $(call KernelPackage,mt7615d_dbdc))

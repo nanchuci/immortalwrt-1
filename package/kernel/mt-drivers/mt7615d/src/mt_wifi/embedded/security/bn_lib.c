@@ -6426,7 +6426,9 @@ static int bnrand(int pseudorand, BIGNUM *rnd, int bits, int top, int bottom)
 {
 	unsigned char *buf = NULL;
 	int ret = 0, bit, bytes, mask;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 	ktime_t tim;
+#endif
 	UINT32 i;
 
 	if (bits == 0) {
@@ -6451,7 +6453,9 @@ static int bnrand(int pseudorand, BIGNUM *rnd, int bits, int top, int bottom)
 	}
 
 	/* make a random number and set the top and bottom bits */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 	NdisGetSystemUpTime((ULONG *)(&tim));
+#endif
 
 	for (i = 0; i < bytes; i++)
 		buf[i] = randombyte();

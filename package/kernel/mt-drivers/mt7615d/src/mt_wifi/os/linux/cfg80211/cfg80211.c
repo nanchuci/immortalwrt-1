@@ -1713,6 +1713,30 @@ static void CFG80211_OpsMgmtFrameRegister(struct wiphy *pWiphy,
 			     reg));
 }
 
+#ifdef CPTCFG_BACKPORTED_CFG80211_MODULE
+static void CFG80211_OpsUpdateMgmtFrameRegistrations(
+	struct wiphy *pWiphy,
+	struct wireless_dev *wdev,
+	struct mgmt_frame_regs *upd)
+{
+	VOID *pAd;
+	struct net_device *dev = NULL;
+	u32 preq_mask = BIT(IEEE80211_STYPE_PROBE_REQ >> 4);
+	u32 action_mask = BIT(IEEE80211_STYPE_ACTION >> 4);
+	MAC80211_PAD_GET_NO_RV(pAd, pWiphy);
+	RTMP_DRIVER_NET_DEV_GET(pAd, &dev);
+
+	CFG80211DBG(DBG_LVL_INFO, ("80211> %s ==>\n", __func__));
+	CFG80211DBG(DBG_LVL_INFO, ("IEEE80211_STYPE_PROBE_REQ = %x, IEEE80211_STYPE_ACTION = %d , (%d)\n", 
+		!!(upd->interface_stypes & preq_mask), !!(upd->interface_mcast_stypes & action_mask),  
+		dev->ieee80211_ptr->iftype));
+
+	RTMP_DRIVER_80211_MGMT_FRAME_REG(pAd, dev, !!(upd->interface_stypes & preq_mask));
+
+	RTMP_DRIVER_80211_ACTION_FRAME_REG(pAd, dev, !!(upd->interface_mcast_stypes & action_mask));
+}
+#endif
+
 /* Supplicant_NEW_TDLS */
 #ifdef CFG_TDLS_SUPPORT
 static int CFG80211_OpsTdlsMgmt(IN struct wiphy *pWiphy,
@@ -2621,6 +2645,9 @@ struct cfg80211_ops CFG80211_Ops = {
 
 	/* configure connection quality monitor RSSI threshold */
 	.set_cqm_rssi_config = NULL,
+
+	/* CPTCFG_BACKPORTED_CFG80211_MODULE */
+	.update_mgmt_frame_registrations = CFG80211_OpsUpdateMgmtFrameRegistrations,
 
 	/* notify driver that a management frame type was registered */
 	.mgmt_frame_register = CFG80211_OpsMgmtFrameRegister,

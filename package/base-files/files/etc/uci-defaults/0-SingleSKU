@@ -1,0 +1,25 @@
+#!/bin/sh
+# Copyright (c) 2013 OpenWrt
+# Copyright (C) 2014 D-Team Technology Co.,Ltd. ShenZhen
+# Copyright (c) 2005-2014, lintel <lintel.huang@gmail.com>
+# Copyright (c) 2020-2022, nanchuci <nanchuci023@gmail.com>
+#
+#     警告:对着屏幕的哥们,我们允许你使用此脚本，但不允许你抹去作者的信息,请保留这段话。
+# 
+
+. /lib/functions.sh
+
+board=$(board_name)
+
+SingleSKU_2G_FILE="/etc/Wireless/SingleSKU_2G.dat"
+SingleSKU_5G_FILE="/etc/Wireless/SingleSKU_5G.dat"
+
+case $board in
+  raisecom,msg1500-x-00*)
+	SingleSKU_2G_FILE="/etc_ro/Wireless/RT2860AP/SingleSKU.dat"
+	SingleSKU_5G_FILE="/etc_ro/Wireless/RT2860AP/SingleSKU_BF.dat"
+  ;;
+esac
+
+[ -f $SingleSKU_2G_FILE ] && ln -s $SingleSKU_2G_FILE  /etc/Wireless/SingleSKU_2G.dat
+[ -f $SingleSKU_5G_FILE ] && ln -s $SingleSKU_5G_FILE  /etc/Wireless/SingleSKU_5G.dat
