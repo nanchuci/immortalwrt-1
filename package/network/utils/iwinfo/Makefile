@@ -41,7 +41,7 @@ endef
 
 define Package/libiwinfo/description
   Wireless information library with simplified API for Broadcom,
-  nl80211, mt_dbdc and wext driver interfaces.
+  nl80211 and wext driver interfaces.
 endef
 
 
