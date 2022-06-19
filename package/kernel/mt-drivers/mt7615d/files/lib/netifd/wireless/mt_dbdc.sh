@@ -70,6 +70,8 @@ drv_mt_dbdc_init_device_config() {
 drv_mt_dbdc_init_iface_config() { 
 	config_add_boolean disabled
 	config_add_string mode bssid ssid encryption
+	config_add_boolean hidden isolate doth ieee80211k
+	config_add_boolean hidden isolate doth ieee80211v
 	config_add_boolean hidden isolate doth ieee80211r
 	config_add_string key key1 key2 key3 key4
 	config_add_string wps
@@ -83,6 +85,12 @@ drv_mt_dbdc_init_iface_config() {
 	config_add_int disassoc_low_ack rssiassoc
 	config_add_string wdsenctype wdskey wdsphymode
 	config_add_int wdswepid wdstxmcs
+
+	# mesh
+	config_add_string mesh_id
+	config_add_int $MP_CONFIG_INT
+	config_add_boolean $MP_CONFIG_BOOL
+	config_add_string $MP_CONFIG_STRING
 }
 
 get_wep_key_type() {
@@ -99,7 +107,7 @@ mt_dbdc_ap_vif_pre_config() {
 	local name="$1"
 
 	json_select config
-	json_get_vars disabled encryption key key1 key2 key3 key4 ssid mode wps pin isolate doth hidden disassoc_low_ack rssiassoc ieee80211r macfilter
+	json_get_vars disabled encryption key key1 key2 key3 key4 ssid mode wps pin isolate doth hidden disassoc_low_ack rssiassoc ieee80211k ieee80211v ieee80211r macfilter
 	json_get_values maclist maclist
 	json_select ..
 	[ "$disabled" == "1" ] && return
@@ -124,7 +132,7 @@ mt_dbdc_ap_vif_pre_config() {
 	let ApBssidNum+=1
 	echo "SSID$ApBssidNum=${ssid}" >> $RTWIFI_PROFILE_PATH #SSID
 	case "$encryption" in #加密方式
-	wpa*|psk*|WPA*|Mixed|mixed)
+	wpa*|psk*|WPA*|*sae*|*SAE*|Mixed|mixed)
 		local enc
 		local crypto
 		case "$encryption" in
@@ -137,11 +145,20 @@ mt_dbdc_ap_vif_pre_config() {
 			WPA*|WPA1*|wpa*|wpa1*|psk*)
 				enc=WPAPSK
 			;;
+			WPA3*|wpa3*|sae)
+				enc=WPA3PSK
+			;;
+			WPA3*|wpa3*|sae-mixed)
+				enc=WPA2PSKWPA3PSK
+			;;
 			esac
 			crypto="AES"
 		case "$encryption" in
 			*tkip+aes*|*tkip+ccmp*|*aes+tkip*|*ccmp+tkip*)
 				crypto="TKIPAES"
+			;;
+			*gcmp*)
+				crypto="GCMP256"
 			;;
 			*aes*|*ccmp*)
 				crypto="AES"
@@ -194,7 +211,7 @@ mt_dbdc_ap_vif_pre_config() {
 	mt_cmd echo "Interface $ifname now up."
 	mt_cmd iwpriv $ifname set NoForwarding=${isolate:-0}
 	mt_cmd iwpriv $ifname set IEEE80211H=${doth:-0}
-	if [ "$wps" == "pbc" ]  && [ "$encryption" != "none" ]; then
+	if [ "$wps" == "pbc" ] || [ "$wps" == "pin" ]  && [ "$encryption" != "none" ]; then
 		echo "Enable WPS for ${ifname}."
 		mt_cmd iwpriv $ifname set WscConfMode=4
 		mt_cmd iwpriv $ifname set WscConfStatus=2
@@ -275,7 +292,7 @@ mt_dbdc_ap_vif_post_config() {
 	local name="$1"
 
 	json_select config
-	json_get_vars disabled encryption key key1 key2 key3 key4 ssid mode wps pin isolate doth hidden disassoc_low_ack rssiassoc ieee80211r
+	json_get_vars disabled encryption key key1 key2 key3 key4 ssid mode wps pin isolate doth hidden disassoc_low_ack rssiassoc ieee80211k ieee80211v ieee80211r
 	json_select ..
 
 	[ "$disabled" == "1" ] && return
@@ -292,7 +309,7 @@ mt_dbdc_sta_vif_post_config() {
 	local name="$1"
 
 	json_select config
-	json_get_vars disabled
+	json_get_vars disabled encryption key key1 key2 key3 key4 ssid mode bssid
 	json_select ..
 
 	[ $stacount -gt 1 ] && {
@@ -300,6 +317,13 @@ mt_dbdc_sta_vif_post_config() {
 	}
 
 	[ "$disabled" == "1" ] && return
+	[ -z "${RTWIFI_IFPREFIX}" ] && [ "$ApIfCNT" == "0" ] && {
+		#FIXME: need ra0 up before apcli0 start
+		ifconfig ra${RTWIFI_IFPREFIX}0 up
+		ifconfig $APCLI_IF up
+		iwpriv ra${RTWIFI_IFPREFIX}0 set DisConnectAllSta=1 2>/dev/null
+		ifconfig ra${RTWIFI_IFPREFIX}0 down
+	}
 	let stacount+=1
 
 	killall  $APCLI_APCTRL
@@ -437,6 +461,12 @@ drv_mt_dbdc_setup() {
 			RTWIFI_CMD_PATH="${RTWIFI_PROFILE_DIR}mt_dbdc_cmd_5g.sh"
 			RTWIFI_CMD_OPATH="${RTWIFI_PROFILE_DIR}mt_dbdc_cmd_2g.sh"
 		;;
+#		ra0usb)
+#			WirelessMode=9
+#			APCLI_IF="apcliusb0"
+#			APCLI_APCTRL="apcli_2g"
+#			RTWIFI_IFPREFIX="usb"
+#		;;
 		*)
 			echo "Unknown phy:$phy_name"
 			return 1
@@ -455,7 +485,7 @@ drv_mt_dbdc_setup() {
 		;;
 		g)
 			WirelessMode=9
-			ITxBfEn=1
+			ITxBfEn=0
 			HT_HTC=1
 		;;
 		*) 
@@ -567,38 +597,46 @@ drv_mt_dbdc_setup() {
 #The word of "Default" must not be removed
 Default
 DBDC_MODE=1
+IcapMode=0
 BssidNum=${RTWIFI_DEF_MAX_BSSID}
 MacAddress=${macaddr}
 CountryRegion=${countryregion:-5}
 CountryRegionABand=${countryregion_a:-7}
-CountryCode=${country:-CN}
+CountryCode=${country:-CN};${country:-CN}
+RRMEnable=${RRMEnable:-1};${RRMEnable:-1};${RRMEnable:-1};${RRMEnable:-1}
+WNMEnable=${WNMEnable:-1};${WNMEnable:-1};${WNMEnable:-1};${WNMEnable:-1}
+WHNAT=1
 WirelessMode=${WirelessMode}
 E2pAccessMode=2
 G_BAND_256QAM=1
 FixedTxMode=
+EthConvertMode=
 TxRate=0
+RxRate=0
 Channel=${channel}
 BasicRate=15
 BeaconPeriod=100
 DtimPeriod=1
+LinkTestSupport=0
+ThermalRecal=0
 PERCENTAGEenable=1
-TxPower=${txpower:-100}
-SKUenable=1
+TxPower=${txpower:-100};${txpower:-100};${txpower:-100};${txpower:-100}
+SKUenable=${SKUenable:-1};${SKUenable:-1}
 BFBACKOFFenable=0
 CalCacheApply=0
 DisableOLBC=0
 BGProtection=0
 TxAntenna=
 RxAntenna=
-TxPreamble=1
+TxPreamble=${TxPreamble:-1};${TxPreamble:-1};${TxPreamble:-1};${TxPreamble:-1}
 RTSThreshold=${rts:-2347}
 FragThreshold=${frag:-2346}
-TxBurst=${txburst:-1}
+TxBurst=${txburst:-1};${txburst:-1};${txburst:-1};${txburst:-1}
 PktAggregate=1
 AutoProvisionEn=0
 FreqDelta=0
 TurboRate=0
-WmmCapable=${wmm:-1}
+WmmCapable=${wmm:-1};${wmm:-1}
 APAifsn=3;7;1;1
 APCwmin=4;4;3;2
 APCwmax=6;10;4;3
@@ -619,19 +657,16 @@ AutoChannelSelect=${AutoChannelSelect:-0}
 IEEE8021X=0
 IEEE80211H=0
 CarrierDetect=0
-ITxBfEn=${ITxBfEn}
-PreAntSwitch=
+ITxBfEn=1
+PreAntSwitch=1
 PhyRateLimit=0
 DebugFlags=0
-ETxBfEnCond=${ITxBfEn}
+ETxBfEnCond=1
 ITxBfTimeout=0
 ETxBfTimeout=0
 ETxBfNoncompress=0
 ETxBfIncapable=0
 MUTxRxEnable=${MU_MIMO:-0}
-DfsEnable=0
-DfsZeroWait=0
-DfsZeroWaitCacTime=255
 FineAGC=0
 StreamMode=0
 StreamModeMac0=
@@ -639,8 +674,13 @@ StreamModeMac1=
 StreamModeMac2=
 StreamModeMac3=
 CSPeriod=6
-RDRegion=
+RDRegion=CE
 StationKeepAlive=0
+DfsCalibration=0
+DfsEnable=1
+DfsApplyStopWifi=0
+DfsZeroWait=1
+DfsZeroWaitCacTime=255
 DfsLowerLimit=0
 DfsUpperLimit=0
 DfsOutdoor=0
@@ -696,40 +736,68 @@ MeshWEPKEY=
 MeshWPAKEY=
 MeshId=
 HSCounter=0
-HT_HTC=${HT_HTC}
-HT_RDG=1
-HT_LDPC=${ldpc:-1}
-HT_LinkAdapt=0
+HT_HTC=${HT_HTC};${HT_HTC};${HT_HTC};${HT_HTC}
+HT_RDG=1;1;1;1
+HT_LDPC=${ldpc:-1};${ldpc:-1};${ldpc:-1};${ldpc:-1}
+HT_LinkAdapt=0;0;0;0
 HT_OpMode=${greenfield:-0}
-HT_MpduDensity=4
+HT_MpduDensity=5;5;5;5
 HT_EXTCHA=${EXTCHA}
-HT_BW=${HT_BW:-0}
-HT_AutoBA=1
-HT_BADecline=0
-HT_AMSDU=1
-UAPSDCapable=1
+HT_BW=${HT_BW:-1}
+HT_AutoBA=1;1;1;1
+HT_BADecline=0;0;0;0
+HT_AMSDU=1;1;1;1
+UAPSDCapable=1;1;1;1
 HT_BAWinSize=64
-HT_GI=${HT_GI:-1}
-HT_STBC=${tx_stbc:-1}
-HT_LDPC=${ldpc:-1}
+HT_GI=${HT_GI:-1};${HT_GI:-1};${HT_GI:-1};${HT_GI:-1}
+HT_STBC=${tx_stbc:-1};${tx_stbc:-1};${tx_stbc:-1};${tx_stbc:-1}
+VHT_LDPC=${ldpc:-1};${ldpc:-1};${ldpc:-1};${ldpc:-1}
 HT_MCS=33
-VHT_BW=${VHT_BW:-0}
-VHT_SGI=1
+VHT_BW=${VHT_BW:-1};${VHT_BW:-1};${VHT_BW:-1};${VHT_BW:-1}
+VHT_Sec80_Channel=0
+VHT_SGI=${VHT_SGI};${VHT_SGI};${VHT_SGI};${VHT_SGI}
 VHT_STBC=${tx_stbc:-1}
-VHT_BW_SIGNAL=0
+VHT_BW_SIGNAL=0;0;0;0
 VHT_DisallowNonVHT=${VHT_DisallowNonVHT:-0}
-VHT_LDPC=${ldpc:-1}
-#HT_TxStream=2
-#HT_RxStream=2
-HT_PROTECT=1
+VHT_LDPC=${ldpc:-1};${ldpc:-1};${ldpc:-1};${ldpc:-1}
+HT_TxStream=2;2;2;2
+HT_RxStream=2;2;2;2
+HT_PROTECT=1;1;1;1;
 HT_DisallowTKIP=${HT_DisallowTKIP:-0}
 HT_BSSCoexistence=${HT_CE:-1}
 HT_BSSCoexApCntThr=10
 GreenAP=${greenap:-0}
 WscConfMode=0
-WscConfStatus=1
+WscConfStatus=2
 WCNTest=0
-RADIUS_Server=
+IgmpSnEnable=1
+AccessPolicy0=0
+AccessControlList0=
+AccessPolicy1=0
+AccessControlList1=
+AccessPolicy2=0
+AccessControlList2=
+AccessPolicy3=0
+AccessControlList3=
+AccessPolicy4=0
+AccessControlList4=
+AccessPolicy5=0
+AccessControlList5=
+AccessPolicy6=0
+AccessControlList6=
+AccessPolicy7=0
+AccessControlList7=
+AccessPolicy8=0
+AccessControlList8=
+WdsEnable=0
+WdsPhyMode=
+WdsEncrypType=NONE
+WdsList=
+Wds0Key=
+Wds1Key=
+Wds2Key=
+Wds3Key=
+RADIUS_Server=0
 RADIUS_Port=1812
 RADIUS_Key1=
 RADIUS_Key2=
@@ -744,8 +812,8 @@ RADIUS_Acct_Port=1813
 RADIUS_Acct_Key=
 own_ip_addr=
 Ethifname=
-EAPifname=
-PreAuthifname=
+EAPifname=br-lan
+PreAuthifname=br-lan
 session_timeout_interval=0
 idle_timeout_interval=0
 WiFiTest=0
@@ -765,14 +833,21 @@ ApCliKey3Type=0
 ApCliKey3Str=
 ApCliKey4Type=0
 ApCliKey4Str=
+MACRepeaterEn=
+MACRepeaterOuiMode=2
+ApCliWirelessMode=15
+ApCliWPAPSK1=
+ApCliKey1Str1=
+ApCliKey2Str1=
+ApCliKey3Str1=
+ApCliKey4Str1=
+EfuseBufferMode=0
 RadioOn=1
 WscManufacturer=PandoraBox
 WscModelName=PandoraBox Wireless Router
 WscDeviceName=PandoraBox WiFi
 WscModelNumber=
 WscSerialNumber=
-WNMEnable=1
-WHNAT=0
 PMFMFPC=0
 PMFMFPR=0
 PMFSHA256=0
@@ -789,14 +864,17 @@ DeauthFloodThreshold=64
 EapReqFloodThreshold=64
 Thermal=100
 EnhanceMultiClient=1
-IgmpSnEnable=0
 #DetectPhy=1
 BGMultiClient=1
 EDCCA=0
 HT_MIMOPSMode=3
 PandoraBoxSmart=${smart:-1}
 RED_Enable=1
-RRMEnable=1
+BW_Enable=0
+BW_Root=0
+BW_Priority=
+BW_Guarantee_Rate=
+BW_Maximum_Rate=
 VOW_Airtime_Ctrl_En=
 VOW_Airtime_Fairness_En=1
 VOW_BW_Ctrl=0
@@ -832,6 +910,7 @@ VOW_WATF_Q_LV3=
 VOW_WMM_Search_Rule_Band0=
 VOW_WMM_Search_Rule_Band1=
 CP_SUPPORT=2
+EDCCAEnable=0
 BandSteering=0
 BndStrgRssiDiff=15
 BndStrgRssiLow=-86
@@ -844,7 +923,7 @@ SkipLongRangeVga=0
 VgaClamp=0
 FastRoaming=0
 AutoRoaming=0
-FtSupport=1
+FtSupport=${FtSupport:-1};${FtSupport:-1};${FtSupport:-1};${FtSupport:-1}
 FtRic=1;1;1;1
 FtOtd=0;0;0;0
 FtMdId1=A1
@@ -870,6 +949,8 @@ VideoHighTxMode=1
 VideoTurbine=1
 VideoTxLifeTimeMode=1
 PcieAspm=0
+WSC_UUID_Str1=d1087a18-aae3-b815-3a5b-001122221146
+WSC_UUID_E1=d1087a18aae3b8153a5b001122221146
 EOF
 
 #for 11ax
@@ -906,6 +987,7 @@ EOF
 	for_each_interface "ap" mt_dbdc_ap_vif_pre_config
 
 	[ "$phy_name" == "ra0" ] && [ "$ApBssidNum" == "0" ] && mt_cmd ifconfig ra0 down
+	[ "$phy_name" == "rax0" ] && [ "$ApBssidNum" == "0" ] && mt_cmd ifconfig rax0 down
 #For DBDC profile merging......
 	while [ $ApBssidNum -lt $RTWIFI_DEF_MAX_BSSID ]
 	do
@@ -958,6 +1040,7 @@ EOF
 
 #Start root device
 		ifconfig ra0 up
+		ifconfig rax0 up
 #restore interfaces
 		sh $RTWIFI_CMD_OPATH
 
