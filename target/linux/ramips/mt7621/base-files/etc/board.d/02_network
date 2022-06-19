@@ -40,6 +40,10 @@ ramips_setup_interfaces()
 	winstars,ws-wn583a6)
 		ucidef_set_interfaces_lan_wan "lan" "wan"
 		;;
+	asus,rt-ac85p)
+		ucidef_add_switch "switch0" \
+			"1:lan" "2:lan" "3:lan" "4:lan" "0:wan" "6u@eth0" "5u@eth1"
+		;;
 	asiarf,ap7621-nv1|\
 	beeline,smartbox-flash|\
 	iptime,a3002mesh|\
@@ -146,6 +150,7 @@ ramips_setup_interfaces()
 			"0:lan" "1:lan" "2:lan" "3:lan" "4:wan" "6u@eth0" "5u@eth1"
 		;;
 	raisecom,msg1500-x-00)
+		ucidef_set_interfaces_lan_wan "eth0 ra0 rax0" "eth1"
 		ucidef_add_switch "switch0" \
 			"0:lan:4" "1:lan:3" "2:lan:2" "3:lan:1" "4:wan:5" "6u@eth0" "5u@eth1"
 		;;
