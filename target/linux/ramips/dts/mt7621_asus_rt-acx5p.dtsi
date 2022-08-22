@@ -135,6 +135,12 @@
 	nvmem-cell-names = "mac-address";
 };
 
+&gmac1 {
+	nvmem-cells = <&macaddr_factory_e000>;
+	nvmem-cell-names = "mac-address";
+	mac-address-increment = <(-2)>;
+};
+
 &switch0 {
 	/* must delete compatible property */
 	/delete-property/ compatible;
@@ -154,9 +160,6 @@
 	mediatek,portmap = "wllll";
 	mediatek,mcm;
 	mt7530,direct-phy-access;
-
-	resets = <&rstctrl 2>;
-	reset-names = "mcm";
 
 	port5: port@5 {
 		compatible = "mediatek,mt753x-port";
@@ -183,6 +186,7 @@
 		#size-cells = <0>;
 	};
 };
+
 
 &state_default {
 	gpio {
