@@ -13,14 +13,14 @@
  
  void __kfree_skb(struct sk_buff *skb)
  {
-+	
-+		
-+		    
-+			
-+				
-+				       
-+		
-+	
++
++
++
++
++
++
++
++
  	skb_release_all(skb);
  	kfree_skbmem(skb);
  }
@@ -30,18 +30,17 @@
  	       offsetof(struct skb_shared_info, frags[skb_shinfo(skb)->nr_frags]));
 -
 +	memcpy(data, skb->head, FOE_INFO_LEN);
-+	
-+		
 +
-+			
-+				
-+				       
-+		
-+	
++
++
++
++
++
++
++
  	/*
  	 * if shinfo is shared we must drop the old head gracefully, but if it
- 	 * is not we can just drop the old head and let the existing refcount 
- 
+ 	 * is not we can just drop the old head and let the existing refcount
 --- a/include/net/netfilter/nf_hnat.h
 +++ b/include/net/netfilter/nf_hnat.h
 @@ -0,0 +1,17 @@
@@ -62,7 +61,6 @@
 +        u16 vlan_id;
 +        u16 pppoe_sid;
 +};
-
 
 --- a/drivers/net/ppp/ppp_generic.c	2022-05-19 13:46:26.673641000 +0800
 +++ b/drivers/net/ppp/ppp_generic.c	2022-05-19 13:58:49.992600593 +0800
@@ -276,7 +274,7 @@
  };
  
  #define IPXIPX_FEATURES (NETIF_F_SG |		\
- 
+
 --- a/net/netfilter/nf_conntrack_proto_tcp.c	2022-05-20 22:09:45.933778000 +0800
 +++ b/net/netfilter/nf_conntrack_proto_tcp.c	2022-05-22 11:26:50.034077741 +0800
 @@ -15,9 +15,9 @@
